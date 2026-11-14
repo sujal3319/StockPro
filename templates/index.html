@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Stock Management System</title>
+    <link rel="stylesheet"
+    href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="navbar">
+    <h2>Stock Management System</h2>
+    <a href="/">Dashboard</a>
+    <a href="/products">Products</a>
+</div>
+
+<div class="container">
+    <h1>Dashboard Overview</h1>
+    <p>Welcome to Stock Management System</p>
+
+    <div class="cards">
+        <div class="card">
+            <h3>Total Products</h3>
+            <h1>{{ total }}</h1>
+        </div>
+
+        <div class="card">
+            <h3>Available Stock</h3>
+            <h1>{{ stock }}</h1>
+        </div>
+    </div>
+
+    <a class="btn" href="/products">
+        Manage Products
+    </a>
+</div>
+
+</body>
+</html>

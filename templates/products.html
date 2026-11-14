@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Products</title>
+    <link rel="stylesheet"
+    href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="navbar">
+    <h2>Stock Management System</h2>
+    <a href="/">Dashboard</a>
+    <a href="/products">Products</a>
+</div>
+
+<div class="container">
+    <h1>Product Management</h1>
+
+    {% with messages = get_flashed_messages() %}
+      {% for message in messages %}
+        <p class="message">{{ message }}</p>
+      {% endfor %}
+    {% endwith %}
+
+    <h2>Add Product</h2>
+
+    <form method="POST" action="/products">
+
+        <input type="text" name="product_name"
+        placeholder="Product Name" required>
+
+        <select name="category_id" required>
+            <option value="">Select Category</option>
+            {% for c in categories %}
+            <option value="{{ c.category_id }}">
+                {{ c.category_name }}
+            </option>
+            {% endfor %}
+        </select>
+
+        <select name="supplier_id" required>
+            <option value="">Select Supplier</option>
+            {% for s in suppliers %}
+            <option value="{{ s.supplier_id }}">
+                {{ s.supplier_name }}
+            </option>
+            {% endfor %}
+        </select>
+
+        <input type="number" step="0.01"
+        name="price" placeholder="Price" min="0" required>
+
+        <input type="number" name="quantity"
+        placeholder="Quantity" min="0" required>
+
+        <button type="submit">Add Product</button>
+    </form>
+
+    <h2>All Products</h2>
+
+    <table>
+        <tr>
+            <th>ID</th>
+            <th>Product</th>
+            <th>Category</th>
+            <th>Supplier</th>
+            <th>Price</th>
+            <th>Quantity</th>
+            <th>Actions</th>
+        </tr>
+
+        {% for p in products %}
+        <tr>
+            <td>{{ p.product_id }}</td>
+            <td>{{ p.product_name }}</td>
+            <td>{{ p.category_name }}</td>
+            <td>{{ p.supplier_name }}</td>
+            <td>{{ p.price }}</td>
+            <td>{{ p.quantity }}</td>
+
+            <td>
+                <details>
+                    <summary>Edit</summary>
+                    <form method="POST"
+                    action="/edit/{{ p.product_id }}">
+
+                        <input name="product_name"
+                        value="{{ p.product_name }}" required>
+
+                        <select name="category_id" required>
+                            {% for c in categories %}
+                            <option value="{{ c.category_id }}"
+                            {% if c.category_id == p.category_id %}
+                            selected {% endif %}>
+                                {{ c.category_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+
+                        <select name="supplier_id" required>
+                            {% for s in suppliers %}
+                            <option value="{{ s.supplier_id }}"
+                            {% if s.supplier_id == p.supplier_id %}
+                            selected {% endif %}>
+                                {{ s.supplier_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+
+                        <input type="number" step="0.01"
+                        name="price" value="{{ p.price }}" required>
+
+                        <input type="number"
+                        name="quantity" value="{{ p.quantity }}" required>
+
+                        <button type="submit">Update</button>
+                    </form>
+                </details>
+
+                <form method="POST"
+                action="/delete/{{ p.product_id }}"
+                onsubmit="return confirm('Delete this product?')">
+
+                    <button class="delete">Delete</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+
+</div>
+
+</body>
+</html>
