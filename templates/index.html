@@ -1,38 +1,169 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Stock Management System</title>
-    <link rel="stylesheet"
-    href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
 
-<div class="navbar">
-    <h2>Stock Management System</h2>
-    <a href="/">Dashboard</a>
-    <a href="/products">Products</a>
-</div>
+{% extends "base.html" %}
 
-<div class="container">
-    <h1>Dashboard Overview</h1>
-    <p>Welcome to Stock Management System</p>
+{% block title %}Dashboard | StockPro{% endblock %}
 
-    <div class="cards">
-        <div class="card">
-            <h3>Total Products</h3>
-            <h1>{{ total }}</h1>
-        </div>
+{% block content %}
 
-        <div class="card">
-            <h3>Available Stock</h3>
-            <h1>{{ stock }}</h1>
-        </div>
+<div class="welcome-section">
+    <div>
+        <h3>Dashboard Overview</h3>
+        <p>Welcome to StockPro! Manage your inventory efficiently.</p>
     </div>
 
-    <a class="btn" href="/products">
-        Manage Products
+    <a href="{{ url_for('products') }}" class="add-btn">
+        <i class="bi bi-plus-circle"></i> Add New Product
     </a>
 </div>
 
-</body>
-</html>
+<div class="row g-3 mb-4">
+
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card">
+            <div class="stat-icon purple"><i class="bi bi-box-seam"></i></div>
+            <div>
+                <p>Total Products</p>
+                <h3>{{ total_products }}</h3>
+                <small>Registered products</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card">
+            <div class="stat-icon blue"><i class="bi bi-stack"></i></div>
+            <div>
+                <p>Total Stock</p>
+                <h3>{{ total_stock }}</h3>
+                <small>Available units</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card">
+            <div class="stat-icon green"><i class="bi bi-tags"></i></div>
+            <div>
+                <p>Categories</p>
+                <h3>{{ total_categories }}</h3>
+                <small>Product categories</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card">
+            <div class="stat-icon orange"><i class="bi bi-truck"></i></div>
+            <div>
+                <p>Suppliers</p>
+                <h3>{{ total_suppliers }}</h3>
+                <small>Registered suppliers</small>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div class="value-card mb-4">
+    <div>
+        <p>Total Inventory Value</p>
+        <h2>₹{{ "%.2f"|format(stock_value|float) }}</h2>
+        <small>Price × Available Stock Quantity</small>
+    </div>
+    <div class="value-icon">
+        <i class="bi bi-currency-rupee"></i>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+
+    <div class="col-lg-7">
+        <div class="content-card">
+            <h5>Inventory Distribution</h5>
+            <p class="section-subtitle">Stock quantity across categories</p>
+
+            <div class="chart-container"
+                 id="stockChartContainer"
+                 data-labels='{{ category_data | map(attribute="category_name") | list | tojson | forceescape }}'
+                 data-quantities='{{ category_data | map(attribute="total_quantity") | list | tojson | forceescape }}'>
+
+                <canvas id="stockChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="content-card">
+            <h5>Low Stock Alerts</h5>
+            <p class="section-subtitle">Products with 5 or fewer units</p>
+
+            {% if low_stock %}
+                {% for item in low_stock %}
+                    <div class="stock-alert">
+                        <div>
+                            <strong>{{ item.product_name }}</strong>
+                            <small>Product ID: #{{ item.product_id }}</small>
+                        </div>
+                        <span class="quantity-badge">{{ item.quantity }} left</span>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p class="text-success">All products have sufficient stock!</p>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+<div class="content-card">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h5>Recent Products</h5>
+            <p class="section-subtitle mb-0">Recently added inventory items</p>
+        </div>
+
+        <a href="{{ url_for('products') }}" class="view-all">View All →</a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Product Name</th>
+                    <th>Category</th>
+                    <th>Price</th>
+                    <th>Quantity</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for product in recent_products %}
+                <tr>
+                    <td>#{{ product.product_id }}</td>
+                    <td>{{ product.product_name }}</td>
+                    <td>{{ product.category_name or 'Unassigned' }}</td>
+                    <td>₹{{ "%.2f"|format(product.price|float) }}</td>
+                    <td>{{ product.quantity }}</td>
+                    <td>
+                        {% if product.quantity <= 5 %}
+                            <span class="status-low">Low Stock</span>
+                        {% else %}
+                            <span class="status-available">Available</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center">No products found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+
+{% endblock %}

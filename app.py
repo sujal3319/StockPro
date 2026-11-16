@@ -1,141 +1,297 @@
+
 from flask import Flask, render_template, request, redirect, url_for, flash
 import mysql.connector
 
 app = Flask(__name__)
-app.secret_key = "stock123"
+app.secret_key = "change-this-to-a-long-random-secret"
 
-# MySQL Database Connection
+
+# ==========================================
+# MYSQL DATABASE CONNECTION
+# ==========================================
+
 def get_connection():
     return mysql.connector.connect(
         host="localhost",
         user="root",
-        password="mahi@9020",
+        password="sujal3319",
         database="stock_management"
     )
 
-# Dashboard
+
+# ==========================================
+# DASHBOARD
+# ==========================================
+
 @app.route("/")
 def index():
-    con = get_connection()
-    cur = con.cursor(dictionary=True)
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
 
-    cur.execute("SELECT COUNT(*) AS total FROM Products")
-    total = cur.fetchone()["total"]
+    try:
+        cursor.execute("""
+            SELECT COUNT(*) AS total_products
+            FROM Products
+        """)
+        total_products = cursor.fetchone()["total_products"]
 
-    cur.execute("SELECT COALESCE(SUM(quantity),0) AS stock FROM Products")
-    stock = cur.fetchone()["stock"]
+        cursor.execute("""
+            SELECT COALESCE(SUM(quantity), 0) AS total_stock
+            FROM Products
+        """)
+        total_stock = cursor.fetchone()["total_stock"]
 
-    cur.close()
-    con.close()
+        cursor.execute("""
+            SELECT COUNT(*) AS total_categories
+            FROM Categories
+        """)
+        total_categories = cursor.fetchone()["total_categories"]
 
-    return render_template(
-        "index.html",
-        total=total,
-        stock=stock
-    )
+        cursor.execute("""
+            SELECT COUNT(*) AS total_suppliers
+            FROM Suppliers
+        """)
+        total_suppliers = cursor.fetchone()["total_suppliers"]
 
-# Display and Add Products
+        cursor.execute("""
+            SELECT COALESCE(SUM(price * quantity), 0) AS stock_value
+            FROM Products
+        """)
+        stock_value = cursor.fetchone()["stock_value"]
+
+        cursor.execute("""
+            SELECT product_id, product_name, quantity
+            FROM Products
+            WHERE quantity <= 5
+            ORDER BY quantity ASC
+        """)
+        low_stock = cursor.fetchall()
+
+        cursor.execute("""
+            SELECT
+                p.product_id,
+                p.product_name,
+                p.price,
+                p.quantity,
+                c.category_name
+            FROM Products p
+            LEFT JOIN Categories c
+                ON p.category_id = c.category_id
+            ORDER BY p.product_id DESC
+            LIMIT 5
+        """)
+        recent_products = cursor.fetchall()
+
+        cursor.execute("""
+            SELECT
+                c.category_name,
+                COALESCE(SUM(p.quantity), 0) AS total_quantity
+            FROM Categories c
+            LEFT JOIN Products p
+                ON c.category_id = p.category_id
+            GROUP BY c.category_id, c.category_name
+            ORDER BY c.category_name
+        """)
+        category_data = cursor.fetchall()
+
+        return render_template(
+            "index.html",
+            total_products=total_products,
+            total_stock=total_stock,
+            total_categories=total_categories,
+            total_suppliers=total_suppliers,
+            stock_value=stock_value,
+            low_stock=low_stock,
+            recent_products=recent_products,
+            category_data=category_data
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+# ==========================================
+# PRODUCTS - VIEW AND ADD
+# ==========================================
+
 @app.route("/products", methods=["GET", "POST"])
 def products():
-    con = get_connection()
-    cur = con.cursor(dictionary=True)
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
 
-    if request.method == "POST":
-        name = request.form["product_name"]
-        category = request.form["category_id"]
-        supplier = request.form["supplier_id"]
-        price = request.form["price"]
-        quantity = request.form["quantity"]
+    try:
+        if request.method == "POST":
+            product_name = request.form.get("product_name", "").strip()
+            category_id = request.form.get("category_id")
+            supplier_id = request.form.get("supplier_id")
+            price = request.form.get("price")
+            quantity = request.form.get("quantity")
 
-        cur.execute("""
-            INSERT INTO Products
-            (product_name, category_id, supplier_id, price, quantity)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (name, category, supplier, price, quantity))
+            try:
+                if not product_name:
+                    raise ValueError("Product name is required.")
 
-        con.commit()
-        cur.close()
-        con.close()
+                category_id = int(category_id)
+                supplier_id = int(supplier_id)
+                price = float(price)
+                quantity = int(quantity)
 
-        flash("Product added successfully!")
-        return redirect(url_for("products"))
+                if price <= 0 or quantity < 0:
+                    raise ValueError("Enter a positive price and non-negative quantity.")
 
-    cur.execute("""
-        SELECT p.*, c.category_name, s.supplier_name
-        FROM Products p
-        INNER JOIN Categories c
-        ON p.category_id = c.category_id
-        INNER JOIN Suppliers s
-        ON p.supplier_id = s.supplier_id
-        ORDER BY p.product_id
-    """)
-    products = cur.fetchall()
+                cursor.execute("""
+                    INSERT INTO Products
+                    (product_name, category_id, supplier_id, price, quantity)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (
+                    product_name,
+                    category_id,
+                    supplier_id,
+                    price,
+                    quantity
+                ))
 
-    cur.execute("SELECT * FROM Categories")
-    categories = cur.fetchall()
+                conn.commit()
+                flash("Product added successfully!", "success")
 
-    cur.execute("SELECT * FROM Suppliers")
-    suppliers = cur.fetchall()
+            except (ValueError, TypeError):
+                conn.rollback()
+                flash("Please enter valid product details.", "danger")
 
-    cur.close()
-    con.close()
+            return redirect(url_for("products"))
 
-    return render_template(
-        "products.html",
-        products=products,
-        categories=categories,
-        suppliers=suppliers
-    )
+        cursor.execute("""
+            SELECT
+                p.product_id,
+                p.product_name,
+                p.category_id,
+                p.supplier_id,
+                p.price,
+                p.quantity,
+                c.category_name,
+                s.supplier_name
+            FROM Products p
+            LEFT JOIN Categories c
+                ON p.category_id = c.category_id
+            LEFT JOIN Suppliers s
+                ON p.supplier_id = s.supplier_id
+            ORDER BY p.product_id DESC
+        """)
+        product_list = cursor.fetchall()
 
-# Update Product
+        cursor.execute("""
+            SELECT category_id, category_name
+            FROM Categories
+            ORDER BY category_name
+        """)
+        categories = cursor.fetchall()
+
+        cursor.execute("""
+            SELECT supplier_id, supplier_name
+            FROM Suppliers
+            ORDER BY supplier_name
+        """)
+        suppliers = cursor.fetchall()
+
+        return render_template(
+            "products.html",
+            products=product_list,
+            categories=categories,
+            suppliers=suppliers
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+# ==========================================
+# EDIT PRODUCT
+# ==========================================
+
 @app.route("/edit/<int:id>", methods=["POST"])
-def edit(id):
-    con = get_connection()
-    cur = con.cursor()
+def edit_product(id):
+    conn = get_connection()
+    cursor = conn.cursor()
 
-    cur.execute("""
-        UPDATE Products
-        SET product_name=%s,
-            category_id=%s,
-            supplier_id=%s,
-            price=%s,
-            quantity=%s
-        WHERE product_id=%s
-    """, (
-        request.form["product_name"],
-        request.form["category_id"],
-        request.form["supplier_id"],
-        request.form["price"],
-        request.form["quantity"],
-        id
-    ))
+    try:
+        product_name = request.form.get("product_name", "").strip()
+        category_id = int(request.form.get("category_id"))
+        supplier_id = int(request.form.get("supplier_id"))
+        price = float(request.form.get("price"))
+        quantity = int(request.form.get("quantity"))
 
-    con.commit()
-    cur.close()
-    con.close()
+        if not product_name or price <= 0 or quantity < 0:
+            raise ValueError("Invalid product details.")
 
-    flash("Product updated successfully!")
+        cursor.execute("""
+            UPDATE Products
+            SET product_name = %s,
+                category_id = %s,
+                supplier_id = %s,
+                price = %s,
+                quantity = %s
+            WHERE product_id = %s
+        """, (
+            product_name,
+            category_id,
+            supplier_id,
+            price,
+            quantity,
+            id
+        ))
+
+        conn.commit()
+        flash("Product updated successfully!", "success")
+
+    except (ValueError, TypeError):
+        conn.rollback()
+        flash("Invalid product details. Please check your inputs.", "danger")
+
+    finally:
+        cursor.close()
+        conn.close()
+
     return redirect(url_for("products"))
 
-# Delete Product
+
+# ==========================================
+# DELETE PRODUCT
+# ==========================================
+
 @app.route("/delete/<int:id>", methods=["POST"])
-def delete(id):
-    con = get_connection()
-    cur = con.cursor()
+def delete_product(id):
+    conn = get_connection()
+    cursor = conn.cursor()
 
-    cur.execute(
-        "DELETE FROM Products WHERE product_id=%s",
-        (id,)
-    )
+    try:
+        cursor.execute("""
+            DELETE FROM Products
+            WHERE product_id = %s
+        """, (id,))
 
-    con.commit()
-    cur.close()
-    con.close()
+        conn.commit()
 
-    flash("Product deleted successfully!")
+        if cursor.rowcount:
+            flash("Product deleted successfully!", "success")
+        else:
+            flash("Product not found.", "warning")
+
+    except mysql.connector.Error:
+        conn.rollback()
+        flash("Unable to delete this product.", "danger")
+
+    finally:
+        cursor.close()
+        conn.close()
+
     return redirect(url_for("products"))
 
+
+# ==========================================
+# RUN APPLICATION
+# ==========================================
 
 if __name__ == "__main__":
     app.run(debug=True)
-
